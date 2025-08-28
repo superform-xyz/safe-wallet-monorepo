@@ -48,6 +48,14 @@ const withPWA = withPWAInit({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'export', // static site export
+  
+  // Exclude dynamic pages from static export
+  exportPathMap: async function (defaultPathMap, { dev, dir, outDir, distDir, buildId }) {
+    const pathMap = { ...defaultPathMap }
+    // Remove dynamic Safe app pages that can't be statically exported
+    delete pathMap['/apps/open']
+    return pathMap
+  },
 
   transpilePackages: ['@safe-global/store'],
   images: {

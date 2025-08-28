@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "dev-prod": "NEXT_PUBLIC_IS_PRODUCTION=true next dev",
     "start": "next dev",
     "build": "next build",
     "lint": "tsc && next lint",

@@ -23,6 +23,7 @@ export const ContentSecurityPolicy = `
  font-src 'self' data:;
  worker-src 'self' blob:;
  img-src * data:;
+ manifest-src 'self';
 `
   .replace(/\s{2,}/g, ' ')
   .trim()

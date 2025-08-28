@@ -1,90 +1,84 @@
 import Head from 'next/head'
-import { useEffect, useState } from 'react'
-import { Box, Button, Typography, Paper, Alert } from '@mui/material'
-import SafeAppsSDK from '@safe-global/safe-apps-sdk'
-import type { EIP712TypedData } from '@safe-global/safe-apps-sdk'
+import { useState } from 'react'
+import { Box, Button, Typography, Paper, Alert, TextField, IconButton } from '@mui/material'
+import { ContentCopy } from '@mui/icons-material'
+import useSuperformInternalSigning from '@/hooks/useSuperformInternalSigning'
 
 const TestSuperformPage = () => {
-  const [sdk, setSdk] = useState<SafeAppsSDK | null>(null)
-  const [result, setResult] = useState<string>('')
+  const [merkleRoot, setMerkleRoot] = useState<string>('')
+  const [signature, setSignature] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
 
-  useEffect(() => {
-    const safeAppsSDK = new SafeAppsSDK({
-      allowedDomains: [/localhost/, /app\.safe\.global/],
-      debug: true,
-    })
-    setSdk(safeAppsSDK)
-  }, [])
+  // Safe internal signing - works inside Safe App
+  const { signSuperformMessage, isReady, safeAddress, isInSafeApp, sdkLoading } = useSuperformInternalSigning()
 
-  const testSuperformSignature = async () => {
-    if (!sdk) return
+  // Debug logging for button state
+  console.log('🔍 Button state debug:')
+  console.log('- loading:', loading)
+  console.log('- isReady:', isReady)
+  console.log('- safeAddress:', safeAddress)
+  console.log('- merkleRoot.trim():', merkleRoot.trim())
+  console.log('- Button disabled:', loading || !merkleRoot.trim() || !safeAddress || !isReady)
+
+  // Test internal Safe signing with Superform integration
+  const signWithInternalIntegration = async (merkleRoot: string): Promise<{ signature: string }> => {
+    if (!safeAddress || !isReady) {
+      throw new Error('Safe address or internal signing not available - must run inside Safe App')
+    }
+
+    console.log('🔗 Using Safe Internal Superform Integration:')
+    console.log('- Merkle root:', merkleRoot)
+    console.log('- Safe address:', safeAddress)
+    console.log('- App URL:', window.location.href)
+
+    try {
+      const result = await signSuperformMessage(merkleRoot)
+      console.log('✅ Internal signing result:', result)
+      console.log('🎯 This signature was generated using SuperformSafe domain (chainId=1)')
+      return result
+    } catch (error) {
+      console.error('Internal signing failed:', error)
+      throw error
+    }
+  }
+
+  const signProductionHash = async () => {
+    if (!merkleRoot.trim() || !safeAddress || !isReady) return
 
     setLoading(true)
     setError('')
-    setResult('')
+    setSignature('')
 
     try {
-      // This will be automatically converted to use SuperformSafe domain by your integration
-      const typedData: EIP712TypedData = {
-        domain: {
-          name: 'TestApp', // This gets converted to 'SuperformSafe' automatically
-          version: '1.0.0',
-          chainId: 42, // This gets converted to chainId=1 automatically
-          verifyingContract: '0x1234567890123456789012345678901234567890',
-        },
-        types: {
-          TestMessage: [
-            { name: 'content', type: 'string' },
-            { name: 'timestamp', type: 'uint256' },
-            { name: 'nonce', type: 'uint256' },
-          ],
-        },
-        message: {
-          content: 'Testing Superform cross-chain signature!',
-          timestamp: Math.floor(Date.now() / 1000),
-          nonce: Math.floor(Math.random() * 1000000),
-        },
-      }
+      // Create the raw hash exactly like AllAccountTypesTest.t.sol
+      const namespace = 'SuperValidator'
+      const rawHashMessage = `${namespace}${merkleRoot}`
 
-      console.log('Original typed data (will be converted):', typedData)
+      console.log('Production signing flow:')
+      console.log('- Merkle root:', merkleRoot)
+      console.log('- Namespace:', namespace)
+      console.log('- Raw hash message:', rawHashMessage)
+      console.log('Safe Address:', safeAddress)
+      console.log('🔄 Using exact Solidity hash construction...')
 
-      // Your integration automatically converts this to use SuperformSafe domain
-      const signature = await sdk.txs.signTypedMessage(typedData)
+      // Use internal Safe Superform integration
+      const result = await signWithInternalIntegration(merkleRoot)
 
-      setResult(`Signature: ${JSON.stringify(signature)}`)
-      console.log('Received signature (using SuperformSafe domain):', signature)
+      setSignature(JSON.stringify(result, null, 2))
+      console.log('✅ Superform signature result:', result)
+      console.log('🎯 This signature is compatible with ChainAgnosticSafeSignatureValidation.sol')
     } catch (err: any) {
       setError(err.message || 'Unknown error occurred')
-      console.error('Signature error:', err)
+      console.error('Production signature error:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  const testSimpleMessage = async () => {
-    if (!sdk) return
-
-    setLoading(true)
-    setError('')
-    setResult('')
-
-    try {
-      const message = 'Hello from Superform! This should use the custom domain.'
-
-      console.log('Requesting message signature:', message)
-
-      // Use the SDK's txs.signMessage method
-      const signature = await sdk.txs.signMessage(message)
-
-      setResult(`Message Signature: ${JSON.stringify(signature)}`)
-      console.log('Received message signature:', signature)
-    } catch (err: any) {
-      setError(err.message || 'Unknown error occurred')
-      console.error('Message signature error:', err)
-    } finally {
-      setLoading(false)
+  const copySignature = () => {
+    if (signature) {
+      navigator.clipboard.writeText(signature)
     }
   }
 
@@ -97,46 +91,59 @@ const TestSuperformPage = () => {
 
       <Box sx={{ p: 3, maxWidth: 800, mx: 'auto' }}>
         <Typography variant="h4" gutterBottom>
-          🔐 Superform Signature Test
+          🔐 Superform Production Signing
         </Typography>
 
         <Typography variant="body1" sx={{ mb: 3 }}>
-          This app tests the Superform cross-chain signature integration. Any signature request is automatically
-          converted to use the &quot;SuperformSafe&quot; domain with chainId=1 for cross-chain compatibility.
+          Production signing tool that uses Safe&apos;s internal signing mechanisms with Superform&apos;s custom domain.
+          This bypasses external wallet providers and works directly within the Safe app context using the
+          &quot;SuperformSafe&quot; domain (chainId=1) for cross-chain compatibility.
         </Typography>
 
-        <Alert severity="info" sx={{ mb: 3 }}>
+        <Alert severity={isInSafeApp ? 'info' : 'warning'} sx={{ mb: 3 }}>
           <Typography variant="body2">
-            <strong>Integration Status:</strong> Your Safe wallet provider automatically converts ALL signature requests
-            to use:
-            <br />• Domain: &quot;SuperformSafe&quot;
-            <br />• Version: &quot;1.0.0&quot;
-            <br />• Chain ID: 1 (fixed for cross-chain)
-            <br />• Compatible with ChainAgnosticSafeSignatureValidation.sol
+            <strong>Safe Address:</strong> {safeAddress || 'Loading...'}
+            <br />
+            <strong>Method:</strong> Safe Internal Superform Integration
+            <br />
+            <strong>Domain:</strong> &quot;SuperformSafe&quot; (chainId=1)
+            <br />
+            <strong>Compatible with:</strong> ChainAgnosticSafeSignatureValidation.sol
+            <br />
+            <strong>Running in Safe App:</strong> {isInSafeApp ? '✅ Yes' : '❌ No - Add as custom app in Safe'}
+            <br />
+            <strong>SDK Loading:</strong> {sdkLoading ? '⏳ Loading...' : '✅ Ready'}
+            <br />
+            <strong>Status:</strong> {isReady ? '✅ Ready' : '⏳ Loading...'}
           </Typography>
         </Alert>
 
         <Paper sx={{ p: 3, mb: 3 }}>
           <Typography variant="h6" gutterBottom>
-            Test Typed Message Signature
+            Production Hash Signing
           </Typography>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            Tests EIP-712 typed data signature with Superform domain
+            Enter the merkle root provided:
           </Typography>
-          <Button variant="contained" onClick={testSuperformSignature} disabled={loading || !sdk} sx={{ mr: 2 }}>
-            {loading ? 'Signing...' : 'Sign Typed Message'}
-          </Button>
-        </Paper>
 
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Test Simple Message Signature
-          </Typography>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Tests simple string message signature with Superform domain
-          </Typography>
-          <Button variant="contained" color="secondary" onClick={testSimpleMessage} disabled={loading || !sdk}>
-            {loading ? 'Signing...' : 'Sign Message'}
+          <TextField
+            fullWidth
+            label="Merkle Root"
+            placeholder="0x..."
+            value={merkleRoot}
+            onChange={(e) => setMerkleRoot(e.target.value)}
+            sx={{ mb: 2 }}
+            multiline
+            rows={2}
+          />
+
+          <Button
+            variant="contained"
+            onClick={signProductionHash}
+            disabled={loading || !merkleRoot.trim() || !safeAddress || !isReady}
+            fullWidth
+          >
+            {loading ? 'Signing...' : 'Sign Production Hash'}
           </Button>
         </Paper>
 
@@ -146,43 +153,95 @@ const TestSuperformPage = () => {
           </Alert>
         )}
 
-        {result && (
+        {signature && (
           <Paper sx={{ p: 3, bgcolor: 'success.light' }}>
             <Typography variant="h6" gutterBottom>
-              ✅ Signature Result
+              ✅ Production Signature
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                wordBreak: 'break-all',
-                fontFamily: 'monospace',
-                fontSize: '0.875rem',
-              }}
-            >
-              {result}
-            </Typography>
-            <Alert severity="info" sx={{ mt: 2 }}>
-              This signature was generated using the SuperformSafe domain (chainId=1) and is compatible with
-              ChainAgnosticSafeSignatureValidation.sol
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+              <TextField
+                fullWidth
+                multiline
+                rows={8}
+                value={signature}
+                variant="outlined"
+                sx={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.875rem',
+                }}
+                InputProps={{
+                  readOnly: true,
+                }}
+              />
+              <IconButton onClick={copySignature} color="primary">
+                <ContentCopy />
+              </IconButton>
+            </Box>
+            <Alert severity="success" sx={{ mt: 2 }}>
+              ✅ <strong>Internal Integration:</strong> This signature was generated using Safe&apos;s internal
+              Superform integration, automatically applying the SuperformSafe domain for cross-chain compatibility.
             </Alert>
           </Paper>
         )}
 
         <Paper sx={{ p: 3, mt: 3, bgcolor: 'grey.50' }}>
           <Typography variant="h6" gutterBottom>
-            🔍 Technical Details
+            🔍 Message Hash Construction
           </Typography>
-          <Typography variant="body2" component="div">
-            <strong>Domain:</strong> &quot;SuperformSafe&quot;
-            <br />
-            <strong>Version:</strong> &quot;1.0.0&quot;
-            <br />
-            <strong>Chain ID:</strong> 1 (fixed for cross-chain compatibility)
-            <br />
-            <strong>Integration:</strong> All signatures automatically use Superform domain
-            <br />
-            <strong>Compatibility:</strong> Works with ChainAgnosticSafeSignatureValidation.sol
-          </Typography>
+          <Box sx={{ bgcolor: 'white', p: 2, borderRadius: 1, border: '1px solid #e0e0e0' }}>
+            <Typography
+              variant="body2"
+              component="div"
+              sx={{ fontFamily: 'monospace', fontSize: '0.875rem', color: 'black' }}
+            >
+              <strong>1. Raw Hash Creation:</strong>
+              <br />
+              <Box
+                component="span"
+                sx={{ bgcolor: '#f5f5f5', p: 0.5, borderRadius: 0.5, display: 'inline-block', mt: 0.5 }}
+              >
+                rawHash = keccak256(abi.encode(&quot;SuperValidator&quot;, merkleRoot))
+              </Box>
+              <br />
+              <br />
+              <strong>2. Domain Separator:</strong>
+              <br />
+              <Box
+                component="span"
+                sx={{
+                  bgcolor: '#f5f5f5',
+                  p: 0.5,
+                  borderRadius: 0.5,
+                  display: 'inline-block',
+                  mt: 0.5,
+                  wordBreak: 'break-all',
+                }}
+              >
+                keccak256(abi.encode(CHAIN_AGNOSTIC_DOMAIN_TYPEHASH,
+                <br />
+                &nbsp;&nbsp;keccak256(&quot;SuperformSafe&quot;), keccak256(&quot;1.0.0&quot;), 1, safeAddress))
+              </Box>
+              <br />
+              <br />
+              <strong>3. Chain Agnostic Hash:</strong>
+              <br />
+              <Box
+                component="span"
+                sx={{
+                  bgcolor: '#f5f5f5',
+                  p: 0.5,
+                  borderRadius: 0.5,
+                  display: 'inline-block',
+                  mt: 0.5,
+                  wordBreak: 'break-all',
+                }}
+              >
+                keccak256(abi.encodePacked(0x19, 0x01, domainSeparator,
+                <br />
+                &nbsp;&nbsp;keccak256(abi.encode(SafeMessageTypeHash, keccak256(abi.encode(rawHash))))))
+              </Box>
+            </Typography>
+          </Box>
         </Paper>
       </Box>
     </>
