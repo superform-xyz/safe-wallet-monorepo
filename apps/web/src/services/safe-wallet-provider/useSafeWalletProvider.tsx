@@ -24,6 +24,7 @@ import { useAppSelector } from '@/store'
 import { selectOnChainSigning } from '@/store/settingsSlice'
 import { isOffchainEIP1271Supported } from '@safe-global/utils/utils/safe-messages'
 import { getCreateCallContractDeployment } from '@safe-global/utils/services/contracts/deployments'
+import { createSuperformSignatureMethods, selectSignatureMethod } from './superform-integration'
 
 export const useTxFlowApi = (chainId: string, safeAddress: string): WalletSDK | undefined => {
   const { safe } = useSafeInfo()
@@ -103,13 +104,26 @@ export const useTxFlowApi = (chainId: string, safeAddress: string): WalletSDK | 
       })
     }
 
+    // Create Superform signature methods
+    const superformMethods = createSuperformSignatureMethods(safeAddress, signMessage)
+
     return {
       async signMessage(message, appInfo) {
-        return await signMessage(message, appInfo, Methods.signMessage)
+        const signMethod = selectSignatureMethod(
+          appInfo,
+          () => signMessage(message, appInfo, Methods.signMessage),
+          () => superformMethods.signSuperformMessage(message, appInfo),
+        )
+        return await signMethod()
       },
 
       async signTypedMessage(typedData, appInfo) {
-        return await signMessage(typedData as TypedData, appInfo, Methods.signTypedMessage)
+        const signMethod = selectSignatureMethod(
+          appInfo,
+          () => signMessage(typedData as TypedData, appInfo, Methods.signTypedMessage),
+          () => superformMethods.signSuperformTypedMessage(typedData as TypedData, appInfo),
+        )
+        return await signMethod()
       },
 
       async send(params: { txs: any[]; params: { safeTxGas: number } }, appInfo) {

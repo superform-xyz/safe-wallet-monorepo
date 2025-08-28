@@ -1,0 +1,9 @@
+{
+  "name": "Superform Signature Test",
+  "description": "Test Superform cross-chain signature integration",
+  "iconPath": "favicon.ico",
+  "website": "http://localhost:8080/test-superform",
+  "chainIds": ["1", "10", "137", "42161", "8453"],
+  "provider": null,
+  "socialProfiles": []
+}

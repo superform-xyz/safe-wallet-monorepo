@@ -10,6 +10,7 @@ import { useMemo } from 'react'
  *
  * @param message message as string, UTF-8 encoded hex string or EIP-712 Typed Data
  * @param safe SafeInfo of the opened Safe
+ * @param appInfo Application information for conditional Superform domain usage
  * @returns `{
  *   decodedMessage,
  *   safeMessageMessage,
@@ -19,6 +20,7 @@ import { useMemo } from 'react'
 const useDecodedSafeMessage = (
   message: string | TypedData,
   safe: SafeState,
+  appInfo?: { name?: string; url?: string },
 ): { decodedMessage: string | TypedData; safeMessageMessage: string; safeMessageHash: string } => {
   // Decode message if UTF-8 encoded
   const decodedMessage = useMemo(() => {
@@ -32,8 +34,8 @@ const useDecodedSafeMessage = (
 
   // Get `SafeMessage` hash
   const safeMessageHash = useMemo(() => {
-    return generateSafeMessageHash(safe, decodedMessage)
-  }, [safe, decodedMessage])
+    return generateSafeMessageHash(safe, decodedMessage, appInfo)
+  }, [safe, decodedMessage, appInfo])
 
   return {
     decodedMessage,

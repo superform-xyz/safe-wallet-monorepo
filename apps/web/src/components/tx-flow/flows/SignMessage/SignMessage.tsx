@@ -42,7 +42,11 @@ import { TX_EVENTS, TX_TYPES } from '@/services/analytics/events/transactions'
 import { SafeTxContext } from '../../SafeTxProvider'
 import RiskConfirmationError from '@/components/tx/SignOrExecuteForm/RiskConfirmationError'
 import { TxSecurityContext } from '@/components/tx/security/shared/TxSecurityContext'
-import { isBlindSigningPayload, isEIP712TypedData } from '@safe-global/utils/utils/safe-messages'
+import {
+  isBlindSigningPayload,
+  isEIP712TypedData,
+  requiresSuperformSignature,
+} from '@safe-global/utils/utils/safe-messages'
 import ApprovalEditor from '@/components/tx/ApprovalEditor'
 import { ErrorBoundary } from '@sentry/react'
 import { isWalletRejection } from '@/utils/wallets'
@@ -259,7 +263,10 @@ const SignMessage = ({ message, origin, requestId }: SignMessageProps): ReactEle
   const wallet = useWallet()
   useHighlightHiddenTab()
 
-  const { decodedMessage, safeMessageMessage, safeMessageHash } = useDecodedSafeMessage(message, safe)
+  // Create appInfo from origin for Superform domain detection
+  const appInfo = origin ? { url: origin } : undefined
+
+  const { decodedMessage, safeMessageMessage, safeMessageHash } = useDecodedSafeMessage(message, safe, appInfo)
   const [safeMessage, setSafeMessage] = useSafeMessage(safeMessageHash)
   const domainHash = getDomainHash({
     chainId: safe.chainId,
@@ -275,6 +282,7 @@ const SignMessage = ({ message, origin, requestId }: SignMessageProps): ReactEle
   const isEip712 = isEIP712TypedData(decodedMessage)
   const isBlindSigningRequest = isBlindSigningPayload(decodedMessage)
   const isBlindSigningEnabled = useAppSelector(selectBlindSigning)
+  const isSuperformSignature = requiresSuperformSignature(appInfo)
   const isDisabled =
     !isOwner || signedByCurrentSafe || !safe.deployed || (!isBlindSigningEnabled && isBlindSigningRequest)
 
@@ -334,6 +342,27 @@ const SignMessage = ({ message, origin, requestId }: SignMessageProps): ReactEle
             isBlindSigningEnabled={isBlindSigningEnabled}
             isBlindSigningPayload={isBlindSigningRequest}
           />
+
+          {isSuperformSignature && (
+            <Box
+              sx={{
+                p: 2,
+                mt: 2,
+                backgroundColor: 'info.background',
+                borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'info.main',
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'info.main' }}>
+                🔗 Cross-chain Superform Signature
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 0.5 }}>
+                This signature uses Superform&apos;s custom domain (&quot;SuperformSafe&quot;, chainId=1) for
+                cross-chain compatibility.
+              </Typography>
+            </Box>
+          )}
 
           <Typography
             sx={{
